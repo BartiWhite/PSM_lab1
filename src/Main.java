@@ -1,5 +1,6 @@
 import java.io.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class Main {
     public static void main(String[] args) throws IOException {
@@ -7,6 +8,7 @@ public class Main {
         List<Object> params = new ArrayList<>();
 
         // todo add modulo function
+        // set mass to 40 when you'll have simulation
 
         try {
             File myObj = new File("/Users/bartek/intellij-workspace/psm_lab1/src/params.txt");
@@ -114,7 +116,7 @@ public class Main {
                     double r2 = coordinates.get(i)[1] - coordinates.get(j)[1];
                     double r3 = coordinates.get(i)[2] - coordinates.get(j)[2];
                     double r = Math.sqrt(Math.pow(r1, 2) + Math.pow(r2, 2) + Math.pow(r3, 2));
-//                    System.out.println(r);
+
                     V_PSum += e*(Math.pow(R/r, 12) - 2*Math.pow(R/r, 6));
                     radius_dif.get(i)[j] = r;
                 } else {
@@ -160,10 +162,11 @@ public class Main {
                     double r_z = coordinates.get(i)[2] - coordinates.get(j)[2];
 
                     double stupidParam = Math.pow(R/r, 12) - 2*Math.pow(R/r, 6);
+                    double rSquared = Math.pow(r, 2);
 
-                    double F_x = 12.0*e*stupidParam*r_x/Math.pow(r, 2);
-                    double F_y = 12.0*e*stupidParam*r_y/Math.pow(r, 2);
-                    double F_z = 12.0*e*stupidParam*r_z/Math.pow(r, 2);
+                    double F_x = 12.0*e*stupidParam*r_x/rSquared;
+                    double F_y = 12.0*e*stupidParam*r_y/rSquared;
+                    double F_z = 12.0*e*stupidParam*r_z/rSquared;
 
                     F_Pij.get(i).add(new double[]{F_x, F_y, F_z});
                 }
@@ -183,6 +186,20 @@ public class Main {
                 double F_z = f*(L - r)*coordinates.get(i)[2]/r;
                 F_Si.add(new double[]{F_x, F_y, F_z});
             }
+        }
+
+        List<double[]> F_i = new ArrayList<>(N - 1);
+        for (int i = 0; i < N; i++) {
+            double[] F_i_tmp = new double[3];
+            for (int j = 0; j < F_Pij.size() - 1; j++) {
+                F_i_tmp[0] += F_Pij.get(i).get(j)[0];
+                F_i_tmp[1] += F_Pij.get(i).get(j)[1];
+                F_i_tmp[2] += F_Pij.get(i).get(j)[2];
+            }
+            F_i_tmp[0] += F_Si.get(i)[0];
+            F_i_tmp[1] += F_Si.get(i)[1];
+            F_i_tmp[2] += F_Si.get(i)[2];
+            F_i.add(F_i_tmp);
         }
 
         double P = 0;
@@ -205,12 +222,62 @@ public class Main {
 
         System.out.println(H);
 
+        List<double[]> simMomentums = new ArrayList<>();
+        List<double[]> simCoordinates = new ArrayList<>();
+        List<double[]> forces = new ArrayList<>();
+        List<Double> E_kin = new ArrayList<>();
 
+        double[] F_0 = new double[3];
 
-        for (int s = 0; s < S_0 + S_d; s++) {
+        simMomentums.add(new double[]{0, 0, 0});
+        simCoordinates.add(new double[]{0, 0, 0});
+        forces.add(F_0);
 
+        for (int s = 1; s < S_0 + S_d; s++) {
+            double[] force = forces.get(s - 1);
+            double[] tmp = new double[]{simMomentums.get(s - 1)[0] + force[0]*tau/2,
+                    simMomentums.get(s - 1)[1] + force[1]*tau/2,
+                    simMomentums.get(s - 1)[2] + force[2]*tau/2};
+            simCoordinates.add(new double[]{simCoordinates.get(s - 1)[0] + tmp[0]*tau/m,
+                    simCoordinates.get(s - 1)[1] + tmp[1]*tau/m,
+                    simCoordinates.get(s - 1)[2] + tmp[2]*tau/m});
+            E_kin.add(modulo(simMomentums.get(s)));
+            forces.add(countForce(simCoordinates.get(s), coordinates, R, N, e, f, L));
+            simMomentums.add(new double[]{tmp[0] + forces.get(s)[0]*tau/2, tmp[1] + forces.get(s)[1]*tau/2, tmp[2] + forces.get(s)[2]*tau/2});
         }
         
 
+    }
+
+    static double[] countForce(double[] r1, List<double[]> coordinates, double R, int N, int e, int f, double L) {
+        double[] F_P = new double[3];
+        for (int j = 0; j < N; j++) {
+            double radius_dif_x = r1[0] - coordinates.get(j)[0];
+            double radius_dif_y = r1[1] - coordinates.get(j)[1];
+            double radius_dif_z = r1[2] - coordinates.get(j)[2];
+            double r = Math.sqrt(Math.pow(r1[0], 2) + Math.pow(r1[1], 2) + Math.pow(r1[2], 2));
+
+            double stupidParam = Math.pow(R/r, 12) - 2*Math.pow(R/r, 6);
+            double rSquared = Math.pow(r, 2);
+
+            F_P[0] += 12.0*e*stupidParam*radius_dif_x/rSquared;
+            F_P[1] += 12.0*e*stupidParam*radius_dif_y/rSquared;
+            F_P[2] += 12.0*e*stupidParam*radius_dif_z/rSquared;
+        }
+
+        double[] F_S = new double[3];
+
+        double r = Math.sqrt(Math.pow(r1[0], 2) + Math.pow(r1[1], 2) + Math.pow(r1[2], 2));
+        if (r > L) {
+            F_S[0] = f*(L - r)*r1[0]/r;
+            F_S[1] = f*(L - r)*r1[1]/r;
+            F_S[2] = f*(L - r)*r1[2]/r;
+        }
+
+        return new double[]{F_P[0] + F_S[0], F_P[1] + F_S[1], F_P[2] + F_S[2]};
+    }
+
+    static double modulo(double[] param) {
+        return Math.sqrt(Math.pow(param[0], 2) + Math.pow(param[1], 2) + Math.pow(param[2], 2));
     }
 }
