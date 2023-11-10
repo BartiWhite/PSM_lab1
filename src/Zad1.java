@@ -246,7 +246,6 @@ public class Zad1 {
     }
 
     private static void updateMomenta(double[][] momenta, double[][] F, double tau, int N) {
-        // todo maybe faster with advanced loop
         double constant = tau/2;
         for (int i = 0; i < N; i++) {
             momenta[i][0] += constant*F[i][0];
