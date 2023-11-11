@@ -5,23 +5,19 @@ public class Zad1 {
     public static void main(String[] args) throws IOException {
         List<Object> params = new ArrayList<>();
 
-        try {
-            File myObj = new File("params.txt");
-            Scanner myReader = new Scanner(myObj);
-            int lineCount = 0;
-            while (myReader.hasNextLine()) {
-                String data = myReader.nextLine();
-                if (lineCount > 8) {
-                    params.add(Double.parseDouble(data));
-                } else {
-                    params.add(Integer.parseInt(data));
-                }
-                lineCount++;
+        File myObj = new File("params.txt");
+        Scanner myReader = new Scanner(myObj);
+        int lineCount = 0;
+        while (myReader.hasNextLine()) {
+            String data = myReader.nextLine().split("\\s+")[0];
+            if (lineCount > 8) {
+                params.add(Double.parseDouble(data));
+            } else {
+                params.add(Integer.parseInt(data));
             }
-            myReader.close();
-        } catch (FileNotFoundException exception) {
-            System.out.println("An error occurred.");
+            lineCount++;
         }
+        myReader.close();
 
         final int n = (int) params.get(0);
         final int m = (int) params.get(1);
@@ -125,29 +121,23 @@ public class Zad1 {
                 saveCoordinatesAndEnergies(argonWriter, N, coordinates, kinEnergies);
             }
 
-            if (i%1000 == 0) {
+            if (i%1000 == 0 && i != 0) {
+                System.out.println("\nExecution progress: " + i/100 + "%");
+                System.out.println("Absolute energy: " + (Arrays.stream(kinEnergies).sum() + potentialAndPressure[0]));
                 long timeStop = System.currentTimeMillis();
-                System.out.println((timeStop - timeStart)/1000);
+                System.out.println("Time: " + (timeStop - timeStart)/1000);
             }
         }
 
         argonWriter.close();
         parametersWriter.close();
 
-        System.out.println("Average pressure is: " + avrPressure/S_d);
-        System.out.println("Average temperature is: " + avrTemperature/S_d);
-        System.out.println("Average hamiltonian is: " + avrHamiltonian/S_d);
-
         long timeStop = System.currentTimeMillis();
-        System.out.println((timeStop - timeStart)/1000);
-    }
+        System.out.println("\nSimulation finished in: " + (timeStop - timeStart)/1000);
 
-    private static void shiftMomenta(double[][] momenta, double momentaShift) {
-        for (double[] momentum : momenta) {
-            momentum[0] = momentum[0] - momentaShift;
-            momentum[1] = momentum[1] - momentaShift;
-            momentum[2] = momentum[2] - momentaShift;
-        }
+        System.out.println("\nAverage pressure: " + avrPressure/S_d);
+        System.out.println("Average temperature: " + avrTemperature/S_d);
+        System.out.println("Average hamiltonian: " + avrHamiltonian/S_d);
     }
 
     private static void getCoordinates(double[] coordinate, double[] b0, double[] b1, double[] b2, double constValue,
@@ -166,6 +156,14 @@ public class Zad1 {
                 .map(momentum -> Arrays.stream(momentum).sum())
                 .mapToDouble(Double::doubleValue)
                 .sum();
+    }
+
+    private static void shiftMomenta(double[][] momenta, double momentaShift) {
+        for (double[] momentum : momenta) {
+            momentum[0] = momentum[0] - momentaShift;
+            momentum[1] = momentum[1] - momentaShift;
+            momentum[2] = momentum[2] - momentaShift;
+        }
     }
 
     private static double[] countPotentialsAndForces(int N, double[][] coordinates, double L, int f, double R, int e,
@@ -188,6 +186,7 @@ public class Zad1 {
                 double sup = R/abs;
                 double constant12 = sup*sup*sup*sup*sup*sup*sup*sup*sup*sup*sup*sup;
                 double constant6 = sup*sup*sup*sup*sup*sup;
+
                 Vp[i] += e*(constant12 - 2*constant6);
                 fillFp(Fp[i], e, abs, constant12, constant6, coordinates[i], coordinates[j], true);
                 fillFp(Fp[j], e, abs, constant12, constant6, coordinates[i], coordinates[j], false);
@@ -199,15 +198,15 @@ public class Zad1 {
         return new double[]{Arrays.stream(Vs).sum() + Arrays.stream(Vp).sum(), pressure};
     }
 
-    private static double abs(double[] vector) {
-        return Math.sqrt(vector[0]*vector[0] + vector[1]*vector[1] + vector[2]*vector[2]);
-    }
-
     private static void fillFs(double[] Fs, double L, int f, double abs, double[] vector) {
         double constant = f*(L - abs)/abs;
         for (int i = 0; i < 3; i++) {
             Fs[i] = vector[i]*constant;
         }
+    }
+
+    private static double abs(double[] vector) {
+        return Math.sqrt(vector[0]*vector[0] + vector[1]*vector[1] + vector[2]*vector[2]);
     }
 
     private static double[] subtractVectors(double[] vector1, double[] vector2) {
@@ -216,8 +215,10 @@ public class Zad1 {
 
     private static void fillFp(double[] Fp, int e, double abs, double constant12, double constant6,
                                double[] vector1, double[] vector2, boolean add) {
+
         double constant = 12*e*(constant12 - constant6)/(abs*abs);
         double[] vector = subtractVectors(vector1, vector2);
+
         for (int i = 0; i < 3; i++) {
             double tmp = vector[i]*constant;
             if (add) {
@@ -236,6 +237,13 @@ public class Zad1 {
         }
     }
 
+    private static double countPressure(double[][] Fs, double L) {
+        return Arrays.stream(Fs)
+                .map(Zad1::abs)
+                .mapToDouble(Double::doubleValue)
+                .sum()/(4*Math.PI*L*L);
+    }
+
     private static double[] equationsOfMotion(double[][] coordinates, double[][] momenta, double tau,
                                           double[][] F, int N, int m, double L, int f, double R, int e) {
         updateMomenta(momenta, F, tau, N);
@@ -247,6 +255,7 @@ public class Zad1 {
 
     private static void updateMomenta(double[][] momenta, double[][] F, double tau, int N) {
         double constant = tau/2;
+
         for (int i = 0; i < N; i++) {
             momenta[i][0] += constant*F[i][0];
             momenta[i][1] += constant*F[i][1];
@@ -256,18 +265,12 @@ public class Zad1 {
 
     private static void updateCoordinate(double[][] coordinates, double[][] momenta, double tau, int N, int m) {
         double constant = tau/m;
+
         for (int i = 0; i < N; i++) {
             coordinates[i][0] += constant*momenta[i][0];
             coordinates[i][1] += constant*momenta[i][1];
             coordinates[i][2] += constant*momenta[i][2];
         }
-    }
-
-    private static double countPressure(double[][] Fs, double L) {
-        return Arrays.stream(Fs)
-                .map(Zad1::abs)
-                .mapToDouble(Double::doubleValue)
-                .sum()/(4*Math.PI*L*L);
     }
 
     private static double[] updateEnergies(int N, double m, double[][] momenta) {
