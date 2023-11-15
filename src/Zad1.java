@@ -28,11 +28,11 @@ public class Zad1 {
         final int S_d = (int) params.get(6);
         final int S_out = (int) params.get(7);
         final int S_xyz = (int) params.get(8);
-        final double L = (double) params.get(9);
         final double a = (double) params.get(10);
         final double R = (double) params.get(11);
         final double tau = (double) params.get(12);
 
+        final double L = 1.23*a*(n-1);
         final double k = 0.00831;
         double time = 0;
 
@@ -99,6 +99,7 @@ public class Zad1 {
 
         BufferedWriter argonWriter = new BufferedWriter(new FileWriter("argon.txt"));
         BufferedWriter parametersWriter = new BufferedWriter(new FileWriter("parameters.xyz"));
+        BufferedWriter energyWriter = new BufferedWriter(new FileWriter("absolute_energy.xyz"));
 
         for (int i = 0; i < S_d; i++) {
             double[] potentialAndPressure = equationsOfMotion(coordinates, momenta, tau, F, N, m, L, f, R, e);
@@ -121,6 +122,10 @@ public class Zad1 {
                 saveCoordinatesAndEnergies(argonWriter, N, coordinates, kinEnergies);
             }
 
+            if (i%10 == 0) {
+                saveEnergy(energyWriter, kinEnergies, potentialAndPressure[0]);
+            }
+
             if (i%1000 == 0 && i != 0) {
                 System.out.println("\nExecution progress: " + i/100 + "%");
                 System.out.println("Absolute energy: " + (Arrays.stream(kinEnergies).sum() + potentialAndPressure[0]));
@@ -131,6 +136,7 @@ public class Zad1 {
 
         argonWriter.close();
         parametersWriter.close();
+        energyWriter.close();
 
         long timeStop = System.currentTimeMillis();
         System.out.println("\nSimulation finished in: " + (timeStop - timeStart)/1000);
@@ -308,6 +314,15 @@ public class Zad1 {
 
     private static void saveParameters(BufferedWriter writer, double time, double V, double P, double T, double H)
             throws IOException {
-        writer.write("Ar" + "\t" + time + "\t" + V + "\t" + P + "\t" + T + "\t" + H + "\n");
+        writer.write(time + "\t" + V + "\t" + P + "\t" + T + "\t" + H + "\n");
+    }
+
+    private static void saveEnergy(BufferedWriter writer, double[] energies, double V) throws IOException {
+        double kinEnergiesSum = 0;
+        for (double energy : energies) {
+            kinEnergiesSum += energy;
+        }
+        double energiesSum = kinEnergiesSum + V;
+        writer.write(kinEnergiesSum + "\t" + V + "\t" + energiesSum + "\n");
     }
 }
